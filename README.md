@@ -74,7 +74,9 @@ Create a `portfolio` table in your Supabase project:
 CREATE TABLE portfolio (
   id INT PRIMARY KEY,
   data JSONB,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_backup BOOLEAN DEFAULT FALSE,
+  backup_created_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Enable Row Level Security
@@ -87,6 +89,26 @@ FOR SELECT USING (true);
 -- Create policy for write access (admin only)
 CREATE POLICY "Enable all operations for anon users" ON portfolio
 FOR ALL USING (true) WITH CHECK (true);
+
+-- Create indexes for backup system
+CREATE INDEX idx_portfolio_backup ON portfolio(is_backup, backup_created_at);
+CREATE INDEX idx_portfolio_id_desc ON portfolio(id DESC);
+```
+
+### 3.1. Automatic Backup System
+
+The system includes an automatic backup feature that creates a backup every time the portfolio is saved:
+
+- **ID 1**: Current active portfolio data
+- **ID 2+**: Automatic backups with incremental IDs
+- **Backup fields**: `is_backup` (boolean) and `backup_created_at` (timestamp)
+- **Automatic cleanup**: Keeps only the last 50 backups (optional)
+
+To enable the backup system, run the additional SQL script:
+
+```bash
+# Execute the database-update.sql file in Supabase SQL Editor
+# This adds backup columns and indexes
 ```
 
 ### 4. Run Development Server

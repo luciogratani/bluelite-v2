@@ -45,7 +45,7 @@ const VenueShowcase: React.FC<VenueShowcaseProps> = ({ venues, destinationName }
       </div>
 
       {/* Category Tabs */}
-      <div className="mb-6 flex gap-2 overflow-x-auto pt-2 scrollbar-hide">
+      <div className="mb-6 flex gap-2 overflow-x-auto pt-2 pb-2 scrollbar-hide">
         {categories.map(cat => (
           <button
             key={cat.key}
@@ -120,7 +120,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, destinationName, category 
           alt={venue.name}
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/80 to-transparent" />
       </div>
 
       {/* Premium Glow Effect */}

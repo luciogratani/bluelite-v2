@@ -7,6 +7,8 @@ import { NextRequest } from 'next/server';
 interface ScrapeRequest {
   instagramHandle: string;
   venueName: string;
+  destination?: string;
+  category?: string;
   confirm?: boolean;
   sessionId?: string;
   closeBrowser?: boolean;
@@ -30,8 +32,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   console.log('🚀 [INSTAGRAM-SCRAPER] Starting Instagram scraping...');
   
   try {
-    const { instagramHandle, venueName, confirm, sessionId, closeBrowser }: ScrapeRequest = await request.json();
-    console.log('📝 [INSTAGRAM-SCRAPER] Request data:', { instagramHandle, venueName, confirm, sessionId, closeBrowser });
+    const { instagramHandle, venueName, destination, category, confirm, sessionId, closeBrowser }: ScrapeRequest = await request.json();
+    console.log('📝 [INSTAGRAM-SCRAPER] Request data:', { instagramHandle, venueName, destination, category, confirm, sessionId, closeBrowser });
 
     // Se è una richiesta di chiusura browser
     if (closeBrowser && sessionId) {
@@ -84,15 +86,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Aspetta che il contenuto si carichi completamente
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Screenshot per debug
-        const screenshotPath = path.join(process.cwd(), 'public', 'debug-screenshot.png');
-        await page.screenshot({ 
-          path: screenshotPath as `${string}.png`, 
-          fullPage: true,
-          type: 'png'
-        });
-        console.log('📸 [INSTAGRAM-SCRAPER] Screenshot saved to:', screenshotPath);
-
         // Estrai TUTTE le immagini (senza filtri) per trovare la prima
         const allImages = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('img'))
@@ -143,8 +136,12 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         console.log(`📸 [INSTAGRAM-SCRAPER] Found ${galleryImageData.length} gallery images matching criteria (height > 300px and height > width)`);
 
-        // Crea cartella per il venue
-        const venueDir = path.join(process.cwd(), 'public', 'venues', currentVenueName.toLowerCase().replace(/\s+/g, '-'));
+        // Crea cartella per il venue con formato destination-category-venue
+        const destinationSlug = destination ? destination.toLowerCase().replace(/\s+/g, '-') : 'unknown';
+        const categorySlug = category ? category.toLowerCase().replace(/\s+/g, '-') : 'unknown';
+        const venueSlug = currentVenueName.toLowerCase().replace(/\s+/g, '-');
+        const folderName = `${destinationSlug}-${categorySlug}-${venueSlug}`;
+        const venueDir = path.join(process.cwd(), 'public', 'venues', folderName);
         console.log('📁 [INSTAGRAM-SCRAPER] Venue directory:', venueDir);
         
         if (!fs.existsSync(venueDir)) {
@@ -161,7 +158,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           const profileFileName = 'profile.jpg';
           const profileFilePath = path.join(venueDir, profileFileName);
           fs.writeFileSync(profileFilePath, Buffer.from(profileBuffer));
-          downloadedProfileImage = `/venues/${currentVenueName.toLowerCase().replace(/\s+/g, '-')}/${profileFileName}`;
+          downloadedProfileImage = `/venues/${folderName}/${profileFileName}`;
           console.log(`✅ [INSTAGRAM-SCRAPER] Saved profileImage: ${profileFilePath}`);
         } catch (error) {
           console.error(`❌ [INSTAGRAM-SCRAPER] Error downloading profileImage:`, (error as Error).message);
@@ -181,7 +178,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             const fileName = `img_${i + 1}.jpg`;
             const filePath = path.join(venueDir, fileName);
             fs.writeFileSync(filePath, Buffer.from(buffer));
-            downloadedImages.push(`/venues/${currentVenueName.toLowerCase().replace(/\s+/g, '-')}/${fileName}`);
+            downloadedImages.push(`/venues/${folderName}/${fileName}`);
             console.log(`✅ [INSTAGRAM-SCRAPER] Saved: ${filePath}`);
           } catch (error) {
             console.error(`❌ [INSTAGRAM-SCRAPER] Error downloading gallery image ${i + 1}:`, (error as Error).message);

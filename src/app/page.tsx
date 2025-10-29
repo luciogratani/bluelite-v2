@@ -129,6 +129,37 @@ export default function HomePage() {
     return destinations.find((d) => d.name.toLowerCase() === slug) || null
   }, [route, destinations])
 
+  // Calculate venue statistics for current destination
+  const venueStats = useMemo(() => {
+    if (!currentDestination?.venues) {
+      return {
+        nightclubs: 0,
+        beachclubs: 0,
+        restaurants: 0,
+        hotels: 0,
+        festive: 0,
+        total: 0
+      }
+    }
+
+    const venues = currentDestination.venues
+    const nightclubs = venues.nightclubs?.length || 0
+    const beachclubs = venues.beachclubs?.length || 0
+    const restaurants = venues.restaurants?.length || 0
+    const hotels = venues.hotels?.length || 0
+    const festive = venues.festive?.length || 0
+    const total = nightclubs + beachclubs + restaurants + hotels + festive
+
+    return {
+      nightclubs,
+      beachclubs,
+      restaurants,
+      hotels,
+      festive,
+      total
+    }
+  }, [currentDestination])
+
   // Parse venue route: #/destination/dubai/venue/nightclubs/ushuaia-dubai
   const currentVenue = useMemo(() => {
     const match = route.match(/^#\/destination\/([^\/]+)\/venue\/([^\/]+)\/(.+)$/)
@@ -272,7 +303,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 max-w-4xl mx-auto">
             {/* Locali Notturni */}
             <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-[2px] text-center transition hover:bg-white/[0.07]">
               <div className="flex justify-center mb-3">
@@ -283,7 +314,7 @@ export default function HomePage() {
                 </svg>
               </div>
               <div className="text-3xl font-semibold tracking-tight text-white">
-                <CountUp from={0} to={5} duration={1.5} />
+                <CountUp from={0} to={venueStats.nightclubs} duration={1.5} />
               </div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
                 Night Clubs
@@ -299,7 +330,7 @@ export default function HomePage() {
                 </svg>
               </div>
               <div className="text-3xl font-semibold tracking-tight text-white">
-                <CountUp from={0} to={7} duration={1.5} delay={0.1} />
+                <CountUp from={0} to={venueStats.beachclubs} duration={1.5} delay={0.1} />
               </div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
                 Beach Clubs
@@ -315,7 +346,7 @@ export default function HomePage() {
                 </svg>
               </div>
               <div className="text-3xl font-semibold tracking-tight text-white">
-                <CountUp from={0} to={16} duration={1.5} delay={0.2} />
+                <CountUp from={0} to={venueStats.restaurants} duration={1.5} delay={0.2} />
               </div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
                 Restaurants
@@ -330,10 +361,26 @@ export default function HomePage() {
                 </svg>
               </div>
               <div className="text-3xl font-semibold tracking-tight text-white">
-                <CountUp from={0} to={7} duration={1.5} delay={0.3} />
+                <CountUp from={0} to={venueStats.hotels} duration={1.5} delay={0.3} />
               </div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
                 Hotels
+              </div>
+            </div>
+
+            {/* Festive */}
+            <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-[2px] text-center transition hover:bg-white/[0.07]">
+              <div className="flex justify-center mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-white/60">
+                  <path d="M12 2v20M2 12h20M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <div className="text-3xl font-semibold tracking-tight text-white">
+                <CountUp from={0} to={venueStats.festive} duration={1.5} delay={0.4} />
+              </div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40">
+                Festive
               </div>
             </div>
           </div>
@@ -342,7 +389,7 @@ export default function HomePage() {
           <div className="mt-8 text-center">
             <div className="inline-flex items-center gap-3 rounded-full bg-white/5 px-5 py-2 ring-1 ring-white/10 backdrop-blur-[2px]">
               <span className="text-2xl font-semibold tracking-tight text-white">
-                <CountUp from={0} to={35} duration={2} delay={0.4} />
+                <CountUp from={0} to={venueStats.total} duration={2} delay={0.5} />
               </span>
               <span className="h-4 w-px bg-white/10" />
               <span className="text-xs uppercase tracking-[0.2em] text-white/50">Total Partners</span>

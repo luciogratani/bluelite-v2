@@ -1,6 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { usePortfolio } from '../hooks/usePortfolio'
+import { useAdminAuth } from '../hooks/useAdminAuth'
+import LoginForm from './LoginForm'
+import BackupViewer from './BackupViewer'
+import { DatabaseBackup, Map, MapPin } from 'lucide-react'
 
 interface AdminProps {}
 
@@ -48,6 +52,7 @@ interface VenuesTabProps {
 
 const Admin: React.FC<AdminProps> = () => {
   const { portfolioData: initialData, loading, error, savePortfolio } = usePortfolio()
+  const { isAuthenticated, adminName, isLoading: authLoading, login, logout } = useAdminAuth()
   
   // Local state for editing
   const [localData, setLocalData] = useState<any>(null)
@@ -72,7 +77,24 @@ const Admin: React.FC<AdminProps> = () => {
   // Initialize local data when portfolio loads
   useEffect(() => {
     if (initialData) {
-      setLocalData(JSON.parse(JSON.stringify(initialData)))
+      const data = JSON.parse(JSON.stringify(initialData))
+      
+      // Ensure all destinations have venues structure
+      if (data.destinations) {
+        data.destinations.forEach((dest: any) => {
+          if (!dest.venues) {
+            dest.venues = {
+              nightclubs: [],
+              beachclubs: [],
+              restaurants: [],
+              hotels: [],
+              festive: []
+            }
+          }
+        })
+      }
+      
+      setLocalData(data)
     }
   }, [initialData])
 
@@ -94,6 +116,23 @@ const Admin: React.FC<AdminProps> = () => {
       setSupabaseStatus('connected')
     }
   }, [loading, error, initialData])
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return <LoginForm onLogin={login} isLoading={authLoading} />
+  }
 
   // Loading state
   if (loading || !localData) {
@@ -140,6 +179,17 @@ const Admin: React.FC<AdminProps> = () => {
 
   const removeToast = (id: string) => {
     setToastNotifications(prev => prev.filter(toast => toast.id !== id))
+  }
+
+  // Calculate total venues count
+  const getTotalVenuesCount = () => {
+    if (!localData?.destinations) return 0
+    return localData.destinations.reduce((total: number, destination: any) => {
+      if (!destination.venues) return total
+      return total + Object.values(destination.venues).reduce((venueTotal: number, venues: any) => {
+        return venueTotal + (Array.isArray(venues) ? venues.length : 0)
+      }, 0)
+    }, 0)
   }
 
   // Toggle Instagram browser session
@@ -284,10 +334,7 @@ const Admin: React.FC<AdminProps> = () => {
                 }`}
               >
                 <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                  </svg>
+                  <Map size={20} className="flex-shrink-0" />
                   {!sidebarCollapsed && (
                     <span className="font-medium">Destinations</span>
                   )}
@@ -307,11 +354,29 @@ const Admin: React.FC<AdminProps> = () => {
                 }`}
               >
                 <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                    <path d="M3 3h18v18H3V3zM7 7h10v2H7V7zM7 11h10v2H7v-2zM7 15h10v2H7v-2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <MapPin size={20} className="flex-shrink-0" />
                   {!sidebarCollapsed && (
                     <span className="font-medium">Venues</span>
+                  )}
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('backups')}
+                className={`w-full rounded-xl transition ${
+                  activeTab === 'backups'
+                    ? 'bg-white/10 text-white ring-1 ring-white/20'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white/80'
+                } ${
+                  sidebarCollapsed 
+                    ? 'flex items-center justify-center p-3' 
+                    : 'text-left px-4 py-3'
+                }`}
+              >
+                <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
+                  <DatabaseBackup size={20} className="flex-shrink-0" />
+                  {!sidebarCollapsed && (
+                    <span className="font-medium">Backups</span>
                   )}
                 </div>
               </button>
@@ -370,6 +435,10 @@ const Admin: React.FC<AdminProps> = () => {
               addToast={addToast}
             />
           )}
+
+          {activeTab === 'backups' && (
+            <BackupViewer />
+          )}
         </main>
       </div>
 
@@ -399,7 +468,12 @@ const Admin: React.FC<AdminProps> = () => {
                 </div>
               )}
               <div className="text-xs text-white/40">
-                {localData?.destinations?.length || 0} destinations
+                {localData?.destinations?.length || 0} destinations • {getTotalVenuesCount()} venues
+                {adminName && (
+                  <span className="ml-2 text-white/60">
+                    • Logged in as {adminName}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -431,6 +505,15 @@ const Admin: React.FC<AdminProps> = () => {
                   All changes saved
                 </div>
               )}
+              
+              {/* Logout Button */}
+              <button
+                onClick={logout}
+                className="px-4 py-2 text-white/60 hover:text-white transition-colors text-sm"
+                title="Logout"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -816,8 +899,8 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
       label: 'Festive', 
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white/60">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M8 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12 2v20M2 12h20M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
         </svg>
       )
     }
@@ -863,6 +946,18 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
     if (editingVenue === index) {
       setEditingVenue(null)
     }
+  }
+
+  // Move image to first position
+  const moveImageToFirst = (venueIndex: number, imageIndex: number) => {
+    const venue = currentVenues[venueIndex]
+    if (!venue.images || venue.images.length === 0) return
+    
+    const newImages = [...venue.images]
+    const [movedImage] = newImages.splice(imageIndex, 1)
+    newImages.unshift(movedImage)
+    
+    updateVenue(venueIndex, 'images', newImages)
   }
 
   // Cycle through venue tiers
@@ -949,6 +1044,8 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
         body: JSON.stringify({
           instagramHandle: venue.instagram,
           venueName: venue.name || 'untitled',
+          destination: currentDestination?.name,
+          category: selectedCategory,
           confirm: true,
           sessionId: instagramSessionId
         })
@@ -1099,6 +1196,8 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
         body: JSON.stringify({
           instagramHandle: venue.instagram,
           venueName: venue.name || 'untitled',
+          destination: currentDestination?.name,
+          category: selectedCategory,
           confirm: true,
           sessionId: sessionId
         })
@@ -1292,7 +1391,11 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
             onDragStart={(e) => handleVenueDragStart(e, index)}
             onDragOver={(e) => handleVenueDragOver(e, index)}
             onDragEnd={handleVenueDragEnd}
-            className={`rounded-xl bg-white/5 ring-1 ring-white/10 transition ${
+            className={`rounded-xl transition ${
+              editingVenue === index 
+                ? 'bg-white/10 ring-2 ring-white/30 border border-white/30' 
+                : 'bg-white/5 ring-1 ring-white/10'
+            } ${
               draggedVenueIndex === index ? 'opacity-50' : ''
             } ${
               editingVenue !== index ? 'cursor-move hover:bg-white/[0.07]' : ''
@@ -1313,45 +1416,55 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
                 <div className="flex-1 min-w-0">
                   {editingVenue === index ? (
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-white/60 mb-2">Name *</label>
-                        <input
-                          type="text"
-                          value={venue.name}
-                          onChange={(e) => updateVenue(index, 'name', e.target.value)}
-                          className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
-                          placeholder="Venue name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-white/60 mb-2">Location *</label>
-                        <input
-                          type="text"
-                          value={venue.location}
-                          onChange={(e) => updateVenue(index, 'location', e.target.value)}
-                          className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
-                          placeholder="Venue location"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-white/60 mb-2">Instagram *</label>
-                        <input
-                          type="text"
-                          value={venue.instagram}
-                          onChange={(e) => updateVenue(index, 'instagram', e.target.value)}
-                          className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
-                          placeholder="@instagram"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-white/60 mb-2">Plus Code *</label>
-                        <input
-                          type="text"
-                          value={venue.plusCode}
-                          onChange={(e) => updateVenue(index, 'plusCode', e.target.value)}
-                          className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
-                          placeholder="Plus code for location"
-                        />
+                      {/* Two-column layout for main fields */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Left Column: Name and Location */}
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-white/60 mb-2">Name *</label>
+                            <input
+                              type="text"
+                              value={venue.name}
+                              onChange={(e) => updateVenue(index, 'name', e.target.value)}
+                              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
+                              placeholder="Venue name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-white/60 mb-2">Location *</label>
+                            <input
+                              type="text"
+                              value={venue.location}
+                              onChange={(e) => updateVenue(index, 'location', e.target.value)}
+                              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
+                              placeholder="Venue location"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Right Column: Instagram and Plus Code */}
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-white/60 mb-2">Instagram *</label>
+                            <input
+                              type="text"
+                              value={venue.instagram}
+                              onChange={(e) => updateVenue(index, 'instagram', e.target.value)}
+                              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
+                              placeholder="@instagram"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-white/60 mb-2">Plus Code *</label>
+                            <input
+                              type="text"
+                              value={venue.plusCode}
+                              onChange={(e) => updateVenue(index, 'plusCode', e.target.value)}
+                              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
+                              placeholder="Plus code for location"
+                            />
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-white/60 mb-2">Images</label>
@@ -1409,13 +1522,13 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
                         {scrapedImages[index] && scrapedImages[index].length > 0 && (
                           <div className="mt-2">
                             <label className="block text-xs font-medium text-white/60 mb-2">Gallery Images</label>
-                            <div className="grid grid-cols-6 gap-2 max-h-60 overflow-y-auto">
+                            <div className="grid grid-cols-10 gap-2 max-h-80 overflow-y-auto">
                               {scrapedImages[index].map((img, imgIndex) => (
                                 <div key={imgIndex} className="relative">
                                   <img
                                     src={img}
                                     alt={`${venue.name} ${imgIndex + 1}`}
-                                    className="w-full h-20 object-cover rounded-lg"
+                                    className="w-full aspect-[4/5] object-cover rounded-lg"
                                   />
                                 </div>
                               ))}
@@ -1461,7 +1574,7 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
                                 )}
                               </div>
                             </div>
-                            <div className="grid grid-cols-6 gap-2 max-h-60 overflow-y-auto">
+                            <div className="grid grid-cols-10 gap-2 max-h-80 overflow-y-auto">
                               {venue.images.map((img, imgIndex) => (
                                 <div 
                                   key={imgIndex} 
@@ -1476,14 +1589,35 @@ const VenuesTab: React.FC<VenuesTabProps> = ({ localData, setLocalData, instagra
                                     e.stopPropagation()
                                     if (deleteImageMode[index]) {
                                       toggleImageSelection(index, img)
+                                    } else {
+                                      // Move image to first position when not in delete mode
+                                      moveImageToFirst(index, imgIndex)
                                     }
                                   }}
                                 >
                                   <img
                                     src={img}
                                     alt={`${venue.name} ${imgIndex + 1}`}
-                                    className="w-full h-20 object-cover rounded-lg"
+                                    className="w-full aspect-[4/5] object-cover rounded-lg"
                                   />
+                                  {!deleteImageMode[index] && (
+                                    <>
+                                      {imgIndex === 0 && (
+                                        <div className="absolute top-1 right-1 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                          Main
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors duration-200 flex items-center justify-center opacity-0 hover:opacity-100">
+                                        <div className="bg-white/90 text-black text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-black">
+                                            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M8 6v12M16 6v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                          </svg>
+                                          {imgIndex === 0 ? 'Already first' : 'Move to first'}
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
                                   {deleteImageMode[index] && (
                                     <div className={`absolute top-1 left-1 w-5 h-5 rounded border-2 flex items-center justify-center ${
                                       selectedImagesToDelete[index]?.has(img)
